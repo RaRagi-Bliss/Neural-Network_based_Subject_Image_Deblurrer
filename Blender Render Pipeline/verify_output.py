@@ -15,8 +15,6 @@ Run with standard Python (no Blender needed):
 """
 
 import argparse
-
-## python3 verify_output.py --outdir ./output --show-statsimport argparse
 import json
 import re
 import sys

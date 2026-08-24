@@ -33,7 +33,7 @@ import os
 import random
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 import bpy
 from mathutils import Euler, Vector
@@ -45,7 +45,8 @@ from mathutils import Euler, Vector
 
 def log(msg: str):
     """Timestamped print that flushes immediately (important for headless runs)."""
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
+    local_now = datetime.now(timezone.utc).astimezone()
+    print(f"[{local_now.strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
 def load_config(path: str) -> dict:
@@ -97,7 +98,11 @@ def configure_render_engine(scene, cfg: dict):
                     d.use = True
                 scene.cycles.device = "GPU"
                 log("Render device: GPU (CUDA)")
-            except Exception:
+            except (RuntimeError, AttributeError, TypeError):
+                # Blender's compute-device API doesn't document a stable
+                # exception type for "this device type isn't available on
+                # this machine" — these three cover the cases actually seen
+                # in practice (no CUDA-capable GPU, driver not found, etc).
                 try:
                     prefs.compute_device_type = "METAL"
                     prefs.get_devices()
@@ -105,7 +110,7 @@ def configure_render_engine(scene, cfg: dict):
                         d.use = True
                     scene.cycles.device = "GPU"
                     log("Render device: GPU (Metal)")
-                except Exception:
+                except (RuntimeError, AttributeError, TypeError):
                     if cfg["blender"].get("fallback_to_cpu", True):
                         scene.cycles.device = "CPU"
                         log("Render device: CPU (fallback)")
@@ -113,6 +118,7 @@ def configure_render_engine(scene, cfg: dict):
                         raise RuntimeError(
                             "GPU not available and fallback_to_cpu is false."
                         )
+
         scene.cycles.samples = cfg["output"].get("samples", 128)
 
 
@@ -125,7 +131,7 @@ def configure_output(scene, cfg: dict):
     scene.render.resolution_percentage = 100
 
 
-def build_procedural_scene(cfg: dict = None):
+def build_procedural_scene(cfg: dict | None = None):
     """
     Create a minimal test scene if no .blend file is provided.
     Replace / extend this with your own 3D assets.
@@ -513,7 +519,7 @@ def apply_camera_motion(camera_obj, cfg: dict) -> dict:
         "motion_type": motion_type,
         "translate_magnitude": round(translate_amount, 4),
         "rotate_magnitude_deg": round(rotate_amount_deg, 2),
-        "delta_location": list(round(v, 4) for v in delta_loc),
+        "delta_location": [round(v, 4) for v in delta_loc],
     }
 
 
@@ -802,10 +808,8 @@ def run_pipeline():
         randomise_scene_objects(cfg)
 
         # Snapshot camera state for metadata
-        cam_location = list(round(v, 4) for v in camera_obj.location)
-        cam_rotation = list(
-            round(math.degrees(v), 2) for v in camera_obj.rotation_euler
-        )
+        cam_location = [round(v, 4) for v in camera_obj.location]
+        cam_rotation = [round(math.degrees(v), 2) for v in camera_obj.rotation_euler]
         cam_lens = round(camera_obj.data.lens, 1)
 
         # ── SHARP render — fully in focus, no motion, ground truth ─────────
@@ -886,7 +890,7 @@ def run_pipeline():
     # ── Write manifest ────────────────────────────────────────────────────
     manifest_path = os.path.join(out_dir, "manifest.json")
     manifest_data = {
-        "generated_at": datetime.now().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "num_pairs": num_renders,
         "seed": seed,
         "config": cfg,
