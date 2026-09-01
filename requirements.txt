@@ -2,3 +2,7 @@ pre-commit
 gitlint
 yamllint
 ruff
+
+bpy
+bpy
+bpy

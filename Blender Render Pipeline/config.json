@@ -1,0 +1,81 @@
+{
+  "_comment": "Blender Training Data Pipeline — Configuration",
+
+  "output": {
+    "directory": "./output",
+    "image_format": "PNG",
+    "color_depth": "8",
+    "resolution_x": 1280,
+    "resolution_y": 720,
+    "samples": 128
+  },
+
+  "pipeline": {
+    "num_renders": 500,
+    "start_index": 0,
+    "_comment_seed": "null = different results every run (recommended). Set an integer here to reproduce a specific run exactly.",
+    "seed": null,
+    "blur_shots_per_sharp": 3,
+    "log_every": 10
+  },
+
+  "camera": {
+    "lens_mm": [24, 85],
+    "location_range": {
+      "x": [-5.0, 5.0],
+      "y": [-8.0, -2.0],
+      "z": [0.5, 4.0]
+    },
+    "look_at_jitter": 0.3,
+
+    "_comment_motion": "Motion blur parameters — how far the camera moves between animation frames",
+    "motion": {
+      "translate_range": [0.03, 1.2],
+      "rotate_range_deg": [0.5, 18.0],
+      "motion_types": ["translate", "rotate", "combined"]
+    },
+
+    "_comment_dof": "Focus-stack effect: each blur shot gets its own random aperture + focus distance, and the focus racks slightly (focus_rack_range) during the simulated exposure, same as the camera motion does.",
+    "depth_of_field": {
+      "enabled": true,
+      "aperture_fstop_range": [1.4, 8.0],
+      "focus_distance_range": [1.0, 8.0],
+      "focus_rack_range": [0.0, 1.0]
+    }
+  },
+
+  "motion_blur": {
+    "shutter_speed": 0.5,
+    "shutter_range": [0.3, 1.0],
+    "randomise_shutter": true,
+    "steps": 2
+  },
+
+  "lighting": {
+    "sun_energy_range": [1.0, 10.0],
+    "sun_rotation_range_deg": [0, 360],
+    "ambient_strength_range": [0.1, 1.0],
+    "_comment_hdri": "Set randomise_hdri true once you have .hdr/.exr files in hdri_directory. Overrides the sun+flat-sky lighting above.",
+    "randomise_hdri": false,
+    "hdri_directory": "./hdri"
+  },
+
+  "scene_objects": {
+    "_comment": "Names of objects to randomise position/rotation for. If using the built-in procedural test scene and these are left empty, the pipeline auto-fills them with the test primitives (Cube, Sphere, etc). Once you load your own .blend via blender.scene_file, list your actual object names here.",
+    "randomise_positions": [],
+    "randomise_rotations": [],
+    "position_range": {
+      "x": [-2.0, 2.0],
+      "y": [-2.0, 2.0],
+      "z": [0.0, 0.0]
+    }
+  },
+
+  "blender": {
+    "scene_file": "",
+    "_comment_scene": "Path to your .blend scene file. Leave empty to use a procedural scene.",
+    "engine": "CYCLES",
+    "device": "GPU",
+    "fallback_to_cpu": true
+  }
+}
