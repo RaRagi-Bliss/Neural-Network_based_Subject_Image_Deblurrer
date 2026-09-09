@@ -2,12 +2,12 @@
   "_comment": "Blender Training Data Pipeline — Configuration",
 
   "output": {
-    "directory": "./output",
+    "directory": "./output2",
     "image_format": "PNG",
     "color_depth": "8",
-    "resolution_x": 1280,
-    "resolution_y": 720,
-    "samples": 128
+    "resolution_x": 1920,
+    "resolution_y": 1080,
+    "samples": 96
   },
 
   "pipeline": {
@@ -38,7 +38,7 @@
     "_comment_dof": "Focus-stack effect: each blur shot gets its own random aperture + focus distance, and the focus racks slightly (focus_rack_range) during the simulated exposure, same as the camera motion does.",
     "depth_of_field": {
       "enabled": true,
-      "aperture_fstop_range": [1.4, 8.0],
+      "aperture_fstop_range": [1.2, 6.3],
       "focus_distance_range": [1.0, 8.0],
       "focus_rack_range": [0.0, 1.0]
     }
@@ -58,6 +58,23 @@
     "_comment_hdri": "Set randomise_hdri true once you have .hdr/.exr files in hdri_directory. Overrides the sun+flat-sky lighting above.",
     "randomise_hdri": false,
     "hdri_directory": "./hdri"
+  },
+
+  "asset_pipeline": {
+    "_comment": "Curated Poly Haven / manual asset pool integration. When enabled, this takes over the floor texture and adds randomised models from your curated pools on top of whatever scene_file/procedural scene you're using. Requires machine_config.json and asset_pools.json to exist (see the .example.json templates) - machine_config.json is NOT portable between machines, edit its paths for each computer before running there.",
+    "enabled": true,
+    "machine_config_path": "machine_config.json",
+    "asset_pools_path": "asset_pools.json",
+    "floor_object_name": "Ground",
+    "min_models": 3,
+    "max_models": 10,
+    "duplicate_cap_percent": 33,
+    "_comment_checkpoint": "Percentage of num_renders between fresh asset selections (which HDRI/floor/models are loaded). Positions/rotations of whatever's currently loaded still randomise every render regardless of this value.",
+    "checkpoint_percent": 10,
+    "_comment_source_mode": "'curated' reads asset_pools.json as-is (default). 'auto_discover' scans poly_haven_library_path directly and classifies every asset from its own info.json - no need to list Poly Haven assets in asset_pools.json manually. Manual-source entries in asset_pools.json are still included either way, since they have no info.json to auto-classify from.",
+    "source_mode": "auto_discover",
+    "_comment_category_allowlist": "Only used in auto_discover mode. If non-empty, only Poly Haven assets whose info.json 'categories' list intersects this list are included - e.g. [\"props\", \"decorative\"]. Empty list = no filtering (everything discovered is included).",
+    "category_allowlist": []
   },
 
   "scene_objects": {

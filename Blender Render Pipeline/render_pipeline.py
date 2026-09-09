@@ -38,6 +38,21 @@ from datetime import datetime, timezone
 import bpy
 from mathutils import Euler, Vector
 
+# Blender's Python doesn't reliably add this script's own directory to
+# sys.path (especially in --background mode with no .blend loaded), so
+# sibling-module imports like asset_pool_blender can silently fail even
+# though the file is right there. Force it in explicitly.
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
+
+from asset_pool_blender import AssetPoolManager  # noqa: E402
+from asset_pool_selection import (  # noqa: E402
+    load_json,
+    validate_machine_config,
+    validate_pools,
+)
+
 # ---------------------------------------------------------------------------
 #  Helpers
 # ---------------------------------------------------------------------------
@@ -156,34 +171,42 @@ def build_procedural_scene(cfg: dict | None = None):
     )
     ground.data.materials.append(mat_ground)
 
-    # A few simple objects as stand-ins — swap for your real assets
-    primitives = [
-        (
-            "Cube",
-            bpy.ops.mesh.primitive_cube_add,
-            {"size": 1.0, "location": (0, 0, 0.5)},
-        ),
-        (
-            "Sphere",
-            bpy.ops.mesh.primitive_uv_sphere_add,
-            {"radius": 0.6, "location": (2, 1, 0.6)},
-        ),
-        (
-            "Cylinder",
-            bpy.ops.mesh.primitive_cylinder_add,
-            {"radius": 0.4, "depth": 1.4, "location": (-2, -1, 0.7)},
-        ),
-        (
-            "Torus",
-            bpy.ops.mesh.primitive_torus_add,
-            {"major_radius": 0.5, "minor_radius": 0.15, "location": (2, -2, 0.5)},
-        ),
-        (
-            "Cone",
-            bpy.ops.mesh.primitive_cone_add,
-            {"radius1": 0.5, "depth": 1.2, "location": (-2, 2, 0.6)},
-        ),
-    ]
+    # A few simple objects as stand-ins — swap for your real assets.
+    # Skipped entirely when the asset pool is enabled, since it provides
+    # real curated models instead and the primitives would just be clutter.
+    use_asset_pool = bool(cfg) and cfg.get("asset_pipeline", {}).get("enabled", False)
+    primitives = []
+
+    if not use_asset_pool:
+        primitives = [
+            (
+                "Cube",
+                bpy.ops.mesh.primitive_cube_add,
+                {"size": 1.0, "location": (0, 0, 0.5)},
+            ),
+            (
+                "Sphere",
+                bpy.ops.mesh.primitive_uv_sphere_add,
+                {"radius": 0.6, "location": (2, 1, 0.6)},
+            ),
+            (
+                "Cylinder",
+                bpy.ops.mesh.primitive_cylinder_add,
+                {"radius": 0.4, "depth": 1.4, "location": (-2, -1, 0.7)},
+            ),
+            (
+                "Torus",
+                bpy.ops.mesh.primitive_torus_add,
+                {"major_radius": 0.5, "minor_radius": 0.15, "location": (2, -2, 0.5)},
+            ),
+            (
+                "Cone",
+                bpy.ops.mesh.primitive_cone_add,
+                {"radius1": 0.5, "depth": 1.2, "location": (-2, 2, 0.6)},
+            ),
+        ]
+    else:
+        log("  Skipping default primitives — asset pool is providing models instead.")
 
     for name, op, kwargs in primitives:
         op(**kwargs)
@@ -230,7 +253,7 @@ def build_procedural_scene(cfg: dict | None = None):
     # which objects to randomise, default to randomising all the primitives
     # we just created — otherwise scene_objects.randomise_positions being
     # empty means every render has objects sitting in identical spots.
-    if cfg is not None:
+    if cfg is not None and primitives:
         obj_cfg = cfg.setdefault("scene_objects", {})
         primitive_names = [name for name, _, _ in primitives]
         if not obj_cfg.get("randomise_positions"):
@@ -784,6 +807,47 @@ def run_pipeline():
     log_every = cfg["pipeline"].get("log_every", 10)
     blur_per_sharp = cfg["pipeline"].get("blur_shots_per_sharp", 1)
 
+    # ── Asset pool pipeline setup (curated Poly Haven / manual assets) ─────
+    asset_cfg = cfg.get("asset_pipeline", {})
+    use_asset_pool = asset_cfg.get("enabled", False)
+    pool_manager = None
+    checkpoint_size = None
+
+    if use_asset_pool:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+
+        mc_path = asset_cfg.get("machine_config_path", "machine_config.json")
+        if not os.path.isabs(mc_path):
+            mc_path = os.path.join(script_dir, mc_path)
+
+        ap_path = asset_cfg.get("asset_pools_path", "asset_pools.json")
+        if not os.path.isabs(ap_path):
+            ap_path = os.path.join(script_dir, ap_path)
+
+        machine_config = load_json(mc_path)
+        asset_pools = load_json(ap_path)
+        validate_machine_config(machine_config)
+        validate_pools(asset_pools)
+
+        pool_manager = AssetPoolManager(
+            machine_config=machine_config,
+            asset_pools=asset_pools,
+            floor_object_name=asset_cfg.get("floor_object_name", "Ground"),
+            min_models=asset_cfg.get("min_models", 3),
+            max_models=asset_cfg.get("max_models", 10),
+            duplicate_cap_percent=asset_cfg.get("duplicate_cap_percent", 33),
+            source_mode=asset_cfg.get("source_mode", "curated"),
+            category_allowlist=asset_cfg.get("category_allowlist", []),
+            log=log,
+        )
+
+        checkpoint_percent = asset_cfg.get("checkpoint_percent", 10)
+        checkpoint_size = max(1, round(num_renders * checkpoint_percent / 100.0))
+        log(
+            f"Asset pool pipeline ENABLED — refreshing asset selection every "
+            f"{checkpoint_size} ground truth(s) ({checkpoint_percent}% of {num_renders})."
+        )
+
     manifest = []
     pipeline_start = time.time()
     total_blur_renders = num_renders * blur_per_sharp
@@ -802,10 +866,43 @@ def run_pipeline():
 
         iter_start = time.time()
 
+        # ── Asset pool checkpoint refresh ───────────────────────────────────
+        # Which HDRI/floor texture/models are loaded only changes at checkpoint
+        # boundaries (every checkpoint_size ground truths) — not every render —
+        # to keep memory bounded and avoid re-reading .blend files constantly.
+        checkpoint_meta = None
+        if use_asset_pool and (i % checkpoint_size == 0):
+            checkpoint_meta = pool_manager.refresh()
+            sel = pool_manager.current_selection
+            log(
+                f"  [checkpoint] hdri={sel['hdri']['name']}  "
+                f"floor={sel['floor_texture']['name']}  "
+                f"models={sel['models_meta']['total_count']} "
+                f"({sel['models_meta']['duplicate_count']} duplicate)"
+            )
+
         # ── Randomise scene (once per ground truth) ────────────────────────
         randomise_camera(camera_obj, cfg)
-        randomise_lighting(cfg)
+
+        # When the asset pool owns the HDRI, skip the legacy flat-directory
+        # HDRI/sun logic entirely and just jitter the pool HDRI's rotation
+        # and strength instead — identity stays fixed within a checkpoint,
+        # but the lighting direction/intensity still varies every render.
+        if use_asset_pool:
+            pool_manager.randomize_hdri_transform(cfg["lighting"])
+        else:
+            randomise_lighting(cfg)
+
         randomise_scene_objects(cfg)
+
+        # Reposition/reorient whichever pool models are currently loaded —
+        # every render, independent of the checkpoint cadence above.
+        if use_asset_pool:
+            pool_manager.randomize_model_transforms(
+                cfg["scene_objects"].get(
+                    "position_range", {"x": [-2, 2], "y": [-2, 2], "z": [0, 0]}
+                )
+            )
 
         # Snapshot camera state for metadata
         cam_location = [round(v, 4) for v in camera_obj.location]
@@ -875,6 +972,16 @@ def run_pipeline():
             "render_time_s": iter_elapsed,
             "seed_offset": i,
         }
+
+        if use_asset_pool and pool_manager.current_selection:
+            sel = pool_manager.current_selection
+            entry["asset_pool"] = {
+                "hdri": sel["hdri"]["name"],
+                "floor_texture": sel["floor_texture"]["name"],
+                "models": [m["name"] for m in sel["models"]],
+                "is_checkpoint_start": checkpoint_meta is not None,
+            }
+
         manifest.append(entry)
 
         if (i + 1) % log_every == 0 or i == 0:

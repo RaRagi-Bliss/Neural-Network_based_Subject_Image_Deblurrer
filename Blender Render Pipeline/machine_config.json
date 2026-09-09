@@ -1,0 +1,6 @@
+{
+  "_comment": "Machine-specific paths. JSON doesn't support real comments, so this key is just documentation - it's ignored by the script. Copy this file to machine_config.json and edit the paths for THIS computer. Not meant to be shared/synced between machines.",
+
+  "poly_haven_library_path": "/Users/Luigi/Documents/Blender/Poly Haven",
+  "manual_asset_library_path": "/Users/Luigi/Documents/Blender/Custom Assets"
+}
