@@ -9,9 +9,9 @@ Handles the "N blur shots per ground truth" structure:
     ...
 
 Run with standard Python (no Blender needed):
-    python verify_output.py                          # checks ./output/
+    python verify_output.py                          # checks ./720p render example/
     python verify_output.py --outdir /path/to/data
-    python verify_output.py --outdir ./output --show-stats
+    python verify_output.py --outdir ./720p render example --show-stats
 """
 
 import argparse
@@ -25,8 +25,10 @@ SHARP_PATTERN = re.compile(r"^(\d+)_sharp$")
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description="Verify training data output")
-    p.add_argument("--outdir", default="./output", help="Output directory to inspect")
+    p = argparse.ArgumentParser(description="Verify training data 720p render example")
+    p.add_argument(
+        "--outdir", default="./720p render example", help="Output directory to inspect"
+    )
     p.add_argument(
         "--show-stats", action="store_true", help="Print detailed statistics"
     )

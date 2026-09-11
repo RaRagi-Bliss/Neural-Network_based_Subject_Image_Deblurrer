@@ -1,2 +1,7 @@
 .git
 .DS_Store
+.idea/
+Blender Render Pipeline/__pycache__/
+*.jpg
+*.jpeg
+*.png

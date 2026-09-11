@@ -7,7 +7,7 @@
 #    ./run_pipeline.sh --count 50               # override num renders
 #    ./run_pipeline.sh --scene my_scene.blend   # use a specific .blend file
 #    ./run_pipeline.sh --config my_cfg.json     # use a different config
-#    ./run_pipeline.sh --outdir /data/renders   # override output directory
+#    ./run_pipeline.sh --outdir /data/renders   # override 720p render example directory
 #
 #  Override the Blender binary location without editing this file:
 #    BLENDER_BIN=/custom/path/to/blender ./run_pipeline.sh --count 50

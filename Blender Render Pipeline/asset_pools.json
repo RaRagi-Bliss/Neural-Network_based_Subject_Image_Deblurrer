@@ -1,0 +1,22 @@
+{
+  "_comment": "Your curated asset pool. Add/remove entries here as you browse and pick assets in Blender's Asset Browser (or drop your own files into your manual library folder). 'name' should match the asset's name as it appears in the source library. 'source' must be either 'poly_haven' or 'manual', matching the paths in machine_config.json. This file is portable across machines - only machine_config.json changes per computer.",
+
+  "hdris": [
+    { "name": "studio_small_03", "source": "poly_haven" },
+    { "name": "kloppenheim_06", "source": "poly_haven" }
+  ],
+
+  "models": [
+    { "name": "Camera_01", "source":  "poly_haven"},
+    { "name": "bleach_bottle", "source": "poly_haven" },
+    { "name": "ArmChair_01", "source": "poly_haven" },
+    { "name": "boombox", "source": "poly_haven" },
+    { "name": "box", "source": "manual" },
+    { "name": "mouse", "source":  "manual"}
+  ],
+
+  "floor_textures": [
+    { "name": "concrete_floor_01", "source": "poly_haven" },
+    { "name": "wood_planks_01", "source": "poly_haven" }
+  ]
+}
