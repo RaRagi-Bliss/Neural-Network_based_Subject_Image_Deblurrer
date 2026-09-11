@@ -79,7 +79,7 @@ def parse_args() -> argparse.Namespace:
         help="Path to curated asset pool file (default: asset_pools.json)",
     )
     parser.add_argument(
-        "--output-dir",
+        "--720p render example-dir",
         default="render_manifests",
         help="Directory to write the manifest into (default: render_manifests)",
     )

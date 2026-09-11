@@ -134,15 +134,19 @@ def configure_render_engine(scene, cfg: dict):
                             "GPU not available and fallback_to_cpu is false."
                         )
 
-        scene.cycles.samples = cfg["output"].get("samples", 128)
+        scene.cycles.samples = cfg["720p render example"].get("samples", 128)
 
 
 def configure_output(scene, cfg: dict):
-    """Set resolution, format, and output path."""
-    scene.render.image_settings.file_format = cfg["output"].get("image_format", "PNG")
-    scene.render.image_settings.color_depth = cfg["output"].get("color_depth", "8")
-    scene.render.resolution_x = cfg["output"].get("resolution_x", 1280)
-    scene.render.resolution_y = cfg["output"].get("resolution_y", 720)
+    """Set resolution, format, and 720p render example path."""
+    scene.render.image_settings.file_format = cfg["720p render example"].get(
+        "image_format", "PNG"
+    )
+    scene.render.image_settings.color_depth = cfg["720p render example"].get(
+        "color_depth", "8"
+    )
+    scene.render.resolution_x = cfg["720p render example"].get("resolution_x", 1280)
+    scene.render.resolution_y = cfg["720p render example"].get("resolution_y", 720)
     scene.render.resolution_percentage = 100
 
 
@@ -666,7 +670,9 @@ def parse_args() -> argparse.Namespace:
         "--count", type=int, default=None, help="Override num_renders from config"
     )
     parser.add_argument(
-        "--outdir", default=None, help="Override output directory from config"
+        "--outdir",
+        default=None,
+        help="Override 720p render example directory from config",
     )
     parser.add_argument(
         "--seed", type=int, default=None, help="Override random seed from config"
@@ -687,8 +693,8 @@ def run_pipeline():
     if not os.path.exists(config_path):
         log(f"Config not found at {config_path} — using built-in defaults.")
         cfg = {
-            "output": {
-                "directory": "./output",
+            "720p render example": {
+                "directory": "./720p render example",
                 "image_format": "PNG",
                 "color_depth": "8",
                 "resolution_x": 1280,
@@ -754,14 +760,14 @@ def run_pipeline():
     if args.count is not None:
         cfg["pipeline"]["num_renders"] = args.count
     if args.outdir is not None:
-        cfg["output"]["directory"] = args.outdir
+        cfg["720p render example"]["directory"] = args.outdir
     if args.seed is not None:
         cfg["pipeline"]["seed"] = args.seed
 
     # Seed RNG
     # A fixed integer seed reproduces the exact same "random" sequence every
     # run — useful for debugging, but it's why you were seeing identical
-    # output every time. Setting "seed": null in config.json (the new
+    # 720p render example every time. Setting "seed": null in config.json (the new
     # default) makes each run genuinely different, while still logging
     # whatever seed got used so a specific run can be reproduced later if
     # you ever need to by passing --seed <that number>.
@@ -774,7 +780,7 @@ def run_pipeline():
     random.seed(seed)
 
     # Output directory
-    out_dir = cfg["output"]["directory"]
+    out_dir = cfg["720p render example"]["directory"]
     if not os.path.isabs(out_dir):
         out_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), out_dir)
     os.makedirs(out_dir, exist_ok=True)
@@ -790,7 +796,7 @@ def run_pipeline():
 
     scene = bpy.context.scene
 
-    # Configure render engine and output settings
+    # Configure render engine and 720p render example settings
     configure_render_engine(scene, cfg)
     configure_output(scene, cfg)
 
