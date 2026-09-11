@@ -1,0 +1,549 @@
+{
+  "generated_at": "2026-09-09T01:13:19.745872+00:00",
+  "num_pairs": 4,
+  "seed": 62139640,
+  "config": {
+    "_comment": "Blender Training Data Pipeline \u2014 Configuration",
+    "output": {
+      "directory": "./output",
+      "image_format": "PNG",
+      "color_depth": "8",
+      "resolution_x": 1280,
+      "resolution_y": 720,
+      "samples": 128
+    },
+    "pipeline": {
+      "num_renders": 4,
+      "start_index": 0,
+      "_comment_seed": "null = different results every run (recommended). Set an integer here to reproduce a specific run exactly.",
+      "seed": null,
+      "blur_shots_per_sharp": 3,
+      "log_every": 10
+    },
+    "camera": {
+      "lens_mm": [
+        24,
+        85
+      ],
+      "location_range": {
+        "x": [
+          -5.0,
+          5.0
+        ],
+        "y": [
+          -8.0,
+          -2.0
+        ],
+        "z": [
+          0.5,
+          4.0
+        ]
+      },
+      "look_at_jitter": 0.3,
+      "_comment_motion": "Motion blur parameters \u2014 how far the camera moves between animation frames",
+      "motion": {
+        "translate_range": [
+          0.03,
+          1.2
+        ],
+        "rotate_range_deg": [
+          0.5,
+          18.0
+        ],
+        "motion_types": [
+          "translate",
+          "rotate",
+          "combined"
+        ]
+      },
+      "_comment_dof": "Focus-stack effect: each blur shot gets its own random aperture + focus distance, and the focus racks slightly (focus_rack_range) during the simulated exposure, same as the camera motion does.",
+      "depth_of_field": {
+        "enabled": true,
+        "aperture_fstop_range": [
+          1.2,
+          6.3
+        ],
+        "focus_distance_range": [
+          1.0,
+          8.0
+        ],
+        "focus_rack_range": [
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "motion_blur": {
+      "shutter_speed": 0.5,
+      "shutter_range": [
+        0.3,
+        1.0
+      ],
+      "randomise_shutter": true,
+      "steps": 2
+    },
+    "lighting": {
+      "sun_energy_range": [
+        1.0,
+        10.0
+      ],
+      "sun_rotation_range_deg": [
+        0,
+        360
+      ],
+      "ambient_strength_range": [
+        0.1,
+        1.0
+      ],
+      "_comment_hdri": "Set randomise_hdri true once you have .hdr/.exr files in hdri_directory. Overrides the sun+flat-sky lighting above.",
+      "randomise_hdri": false,
+      "hdri_directory": "./hdri"
+    },
+    "asset_pipeline": {
+      "_comment": "Curated Poly Haven / manual asset pool integration. When enabled, this takes over the floor texture and adds randomised models from your curated pools on top of whatever scene_file/procedural scene you're using. Requires machine_config.json and asset_pools.json to exist (see the .example.json templates) - machine_config.json is NOT portable between machines, edit its paths for each computer before running there.",
+      "enabled": true,
+      "machine_config_path": "machine_config.json",
+      "asset_pools_path": "asset_pools.json",
+      "floor_object_name": "Ground",
+      "min_models": 3,
+      "max_models": 10,
+      "duplicate_cap_percent": 33,
+      "_comment_checkpoint": "Percentage of num_renders between fresh asset selections (which HDRI/floor/models are loaded). Positions/rotations of whatever's currently loaded still randomise every render regardless of this value.",
+      "checkpoint_percent": 10,
+      "_comment_source_mode": "'curated' reads asset_pools.json as-is (default). 'auto_discover' scans poly_haven_library_path directly and classifies every asset from its own info.json - no need to list Poly Haven assets in asset_pools.json manually. Manual-source entries in asset_pools.json are still included either way, since they have no info.json to auto-classify from.",
+      "source_mode": "curated",
+      "_comment_category_allowlist": "Only used in auto_discover mode. If non-empty, only Poly Haven assets whose info.json 'categories' list intersects this list are included - e.g. [\"props\", \"decorative\"]. Empty list = no filtering (everything discovered is included).",
+      "category_allowlist": []
+    },
+    "scene_objects": {
+      "_comment": "Names of objects to randomise position/rotation for. If using the built-in procedural test scene and these are left empty, the pipeline auto-fills them with the test primitives (Cube, Sphere, etc). Once you load your own .blend via blender.scene_file, list your actual object names here.",
+      "randomise_positions": [],
+      "randomise_rotations": [],
+      "position_range": {
+        "x": [
+          -2.0,
+          2.0
+        ],
+        "y": [
+          -2.0,
+          2.0
+        ],
+        "z": [
+          0.0,
+          0.0
+        ]
+      }
+    },
+    "blender": {
+      "scene_file": "",
+      "_comment_scene": "Path to your .blend scene file. Leave empty to use a procedural scene.",
+      "engine": "CYCLES",
+      "device": "GPU",
+      "fallback_to_cpu": true
+    }
+  },
+  "pairs": [
+    {
+      "index": 0,
+      "sharp_file": "00000_sharp.png",
+      "blur_variants": [
+        {
+          "blur_file": "00000_blur_00.png",
+          "blur_index": 0,
+          "motion_blur": {
+            "motion_type": "translate",
+            "translate_magnitude": 0.3305,
+            "rotate_magnitude_deg": 7.33,
+            "delta_location": [
+              -0.3035,
+              0.0934,
+              -0.0917
+            ],
+            "shutter_speed": 0.669
+          },
+          "depth_of_field": {
+            "enabled": true,
+            "aperture_fstop": 5.38,
+            "focus_distance_start": 7.909,
+            "focus_distance_end": 8.21,
+            "focus_rack_delta": 0.301
+          }
+        },
+        {
+          "blur_file": "00000_blur_01.png",
+          "blur_index": 1,
+          "motion_blur": {
+            "motion_type": "translate",
+            "translate_magnitude": 0.6661,
+            "rotate_magnitude_deg": 1.08,
+            "delta_location": [
+              0.424,
+              0.062,
+              0.51
+            ],
+            "shutter_speed": 0.804
+          },
+          "depth_of_field": {
+            "enabled": true,
+            "aperture_fstop": 2.73,
+            "focus_distance_start": 5.956,
+            "focus_distance_end": 5.261,
+            "focus_rack_delta": -0.695
+          }
+        },
+        {
+          "blur_file": "00000_blur_02.png",
+          "blur_index": 2,
+          "motion_blur": {
+            "motion_type": "rotate",
+            "translate_magnitude": 0.3774,
+            "rotate_magnitude_deg": 13.83,
+            "delta_location": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "shutter_speed": 0.429
+          },
+          "depth_of_field": {
+            "enabled": true,
+            "aperture_fstop": 4.23,
+            "focus_distance_start": 3.752,
+            "focus_distance_end": 3.896,
+            "focus_rack_delta": 0.144
+          }
+        }
+      ],
+      "camera": {
+        "location": [
+          -1.6028,
+          -5.912,
+          3.8163
+        ],
+        "rotation_deg": [
+          59.84,
+          0.0,
+          -16.23
+        ],
+        "lens_mm": 60.1
+      },
+      "render_time_s": 88.9,
+      "seed_offset": 0,
+      "asset_pool": {
+        "hdri": "kloppenheim_06",
+        "floor_texture": "concrete_floor_01",
+        "models": [
+          "bleach_bottle",
+          "ArmChair_01",
+          "Camera_01",
+          "boombox",
+          "ArmChair_01",
+          "box"
+        ],
+        "is_checkpoint_start": true
+      }
+    },
+    {
+      "index": 1,
+      "sharp_file": "00001_sharp.png",
+      "blur_variants": [
+        {
+          "blur_file": "00001_blur_00.png",
+          "blur_index": 0,
+          "motion_blur": {
+            "motion_type": "rotate",
+            "translate_magnitude": 1.1548,
+            "rotate_magnitude_deg": 1.22,
+            "delta_location": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "shutter_speed": 0.607
+          },
+          "depth_of_field": {
+            "enabled": true,
+            "aperture_fstop": 5.4,
+            "focus_distance_start": 1.776,
+            "focus_distance_end": 2.558,
+            "focus_rack_delta": 0.782
+          }
+        },
+        {
+          "blur_file": "00001_blur_01.png",
+          "blur_index": 1,
+          "motion_blur": {
+            "motion_type": "combined",
+            "translate_magnitude": 0.4002,
+            "rotate_magnitude_deg": 15.64,
+            "delta_location": [
+              -0.2735,
+              -0.1062,
+              -0.2722
+            ],
+            "shutter_speed": 0.905
+          },
+          "depth_of_field": {
+            "enabled": true,
+            "aperture_fstop": 3.49,
+            "focus_distance_start": 4.031,
+            "focus_distance_end": 4.635,
+            "focus_rack_delta": 0.604
+          }
+        },
+        {
+          "blur_file": "00001_blur_02.png",
+          "blur_index": 2,
+          "motion_blur": {
+            "motion_type": "combined",
+            "translate_magnitude": 0.7128,
+            "rotate_magnitude_deg": 5.44,
+            "delta_location": [
+              -0.4997,
+              0.1907,
+              -0.4712
+            ],
+            "shutter_speed": 0.441
+          },
+          "depth_of_field": {
+            "enabled": true,
+            "aperture_fstop": 4.31,
+            "focus_distance_start": 6.171,
+            "focus_distance_end": 6.748,
+            "focus_rack_delta": 0.577
+          }
+        }
+      ],
+      "camera": {
+        "location": [
+          -3.873,
+          -5.0837,
+          3.7828
+        ],
+        "rotation_deg": [
+          60.93,
+          -0.0,
+          -37.55
+        ],
+        "lens_mm": 54.0
+      },
+      "render_time_s": 99.7,
+      "seed_offset": 1,
+      "asset_pool": {
+        "hdri": "kloppenheim_06",
+        "floor_texture": "wood_planks_01",
+        "models": [
+          "mouse",
+          "Camera_01",
+          "Camera_01",
+          "ArmChair_01",
+          "bleach_bottle",
+          "box",
+          "boombox",
+          "ArmChair_01"
+        ],
+        "is_checkpoint_start": true
+      }
+    },
+    {
+      "index": 2,
+      "sharp_file": "00002_sharp.png",
+      "blur_variants": [
+        {
+          "blur_file": "00002_blur_00.png",
+          "blur_index": 0,
+          "motion_blur": {
+            "motion_type": "combined",
+            "translate_magnitude": 0.1118,
+            "rotate_magnitude_deg": 1.42,
+            "delta_location": [
+              -0.0414,
+              -0.0434,
+              -0.0943
+            ],
+            "shutter_speed": 0.941
+          },
+          "depth_of_field": {
+            "enabled": true,
+            "aperture_fstop": 4.53,
+            "focus_distance_start": 3.963,
+            "focus_distance_end": 2.975,
+            "focus_rack_delta": -0.988
+          }
+        },
+        {
+          "blur_file": "00002_blur_01.png",
+          "blur_index": 1,
+          "motion_blur": {
+            "motion_type": "translate",
+            "translate_magnitude": 0.0341,
+            "rotate_magnitude_deg": 3.18,
+            "delta_location": [
+              0.0248,
+              -0.008,
+              -0.022
+            ],
+            "shutter_speed": 0.671
+          },
+          "depth_of_field": {
+            "enabled": true,
+            "aperture_fstop": 2.36,
+            "focus_distance_start": 4.407,
+            "focus_distance_end": 3.78,
+            "focus_rack_delta": -0.627
+          }
+        },
+        {
+          "blur_file": "00002_blur_02.png",
+          "blur_index": 2,
+          "motion_blur": {
+            "motion_type": "combined",
+            "translate_magnitude": 0.7781,
+            "rotate_magnitude_deg": 3.95,
+            "delta_location": [
+              0.7287,
+              0.1135,
+              0.2479
+            ],
+            "shutter_speed": 0.472
+          },
+          "depth_of_field": {
+            "enabled": true,
+            "aperture_fstop": 1.66,
+            "focus_distance_start": 1.589,
+            "focus_distance_end": 1.313,
+            "focus_rack_delta": -0.276
+          }
+        }
+      ],
+      "camera": {
+        "location": [
+          3.8615,
+          -5.2805,
+          1.6266
+        ],
+        "rotation_deg": [
+          77.05,
+          -0.0,
+          36.8
+        ],
+        "lens_mm": 83.6
+      },
+      "render_time_s": 94.8,
+      "seed_offset": 2,
+      "asset_pool": {
+        "hdri": "studio_small_03",
+        "floor_texture": "concrete_floor_01",
+        "models": [
+          "box",
+          "bleach_bottle",
+          "mouse",
+          "box"
+        ],
+        "is_checkpoint_start": true
+      }
+    },
+    {
+      "index": 3,
+      "sharp_file": "00003_sharp.png",
+      "blur_variants": [
+        {
+          "blur_file": "00003_blur_00.png",
+          "blur_index": 0,
+          "motion_blur": {
+            "motion_type": "translate",
+            "translate_magnitude": 0.09,
+            "rotate_magnitude_deg": 15.89,
+            "delta_location": [
+              0.028,
+              -0.0803,
+              -0.0296
+            ],
+            "shutter_speed": 0.518
+          },
+          "depth_of_field": {
+            "enabled": true,
+            "aperture_fstop": 3.49,
+            "focus_distance_start": 1.75,
+            "focus_distance_end": 2.066,
+            "focus_rack_delta": 0.316
+          }
+        },
+        {
+          "blur_file": "00003_blur_01.png",
+          "blur_index": 1,
+          "motion_blur": {
+            "motion_type": "translate",
+            "translate_magnitude": 1.1139,
+            "rotate_magnitude_deg": 9.94,
+            "delta_location": [
+              -0.5679,
+              0.5714,
+              0.7692
+            ],
+            "shutter_speed": 0.581
+          },
+          "depth_of_field": {
+            "enabled": true,
+            "aperture_fstop": 3.34,
+            "focus_distance_start": 4.456,
+            "focus_distance_end": 3.627,
+            "focus_rack_delta": -0.828
+          }
+        },
+        {
+          "blur_file": "00003_blur_02.png",
+          "blur_index": 2,
+          "motion_blur": {
+            "motion_type": "combined",
+            "translate_magnitude": 0.1594,
+            "rotate_magnitude_deg": 12.43,
+            "delta_location": [
+              0.1176,
+              0.0799,
+              0.072
+            ],
+            "shutter_speed": 0.687
+          },
+          "depth_of_field": {
+            "enabled": true,
+            "aperture_fstop": 4.58,
+            "focus_distance_start": 6.649,
+            "focus_distance_end": 6.537,
+            "focus_rack_delta": -0.112
+          }
+        }
+      ],
+      "camera": {
+        "location": [
+          2.6668,
+          -6.1902,
+          2.9917
+        ],
+        "rotation_deg": [
+          65.66,
+          -0.0,
+          23.56
+        ],
+        "lens_mm": 60.9
+      },
+      "render_time_s": 97.8,
+      "seed_offset": 3,
+      "asset_pool": {
+        "hdri": "studio_small_03",
+        "floor_texture": "concrete_floor_01",
+        "models": [
+          "ArmChair_01",
+          "bleach_bottle",
+          "mouse",
+          "boombox",
+          "Camera_01",
+          "boombox",
+          "boombox",
+          "box"
+        ],
+        "is_checkpoint_start": true
+      }
+    }
+  ]
+}

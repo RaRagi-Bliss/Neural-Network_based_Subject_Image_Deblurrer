@@ -1,0 +1,66 @@
+{
+  "generated_at": "2026-09-08T22:27:24",
+  "hdri": {
+    "name": "kloppenheim_06",
+    "source": "poly_haven",
+    "library_path": "/Users/Luigi/Documents/Blender/Poly Haven"
+  },
+  "floor_texture": {
+    "name": "wood_planks_01",
+    "source": "poly_haven",
+    "library_path": "/Users/Luigi/Documents/Blender/Poly Haven"
+  },
+  "models": [
+    {
+      "name": "cigarette_case",
+      "source": "poly_haven",
+      "library_path": "/Users/Luigi/Documents/Blender/Poly Haven"
+    },
+    {
+      "name": "box",
+      "source": "manual",
+      "library_path": "/Users/Luigi/Documents/Blender/Custom Assets"
+    },
+    {
+      "name": "wooden_barrels_01",
+      "source": "poly_haven",
+      "library_path": "/Users/Luigi/Documents/Blender/Poly Haven"
+    },
+    {
+      "name": "wooden_barrels_01",
+      "source": "poly_haven",
+      "library_path": "/Users/Luigi/Documents/Blender/Poly Haven"
+    },
+    {
+      "name": "box",
+      "source": "manual",
+      "library_path": "/Users/Luigi/Documents/Blender/Custom Assets"
+    },
+    {
+      "name": "Camera_01",
+      "source": "poly_haven",
+      "library_path": "/Users/Luigi/Documents/Blender/Poly Haven"
+    },
+    {
+      "name": "bronze_ray_statue",
+      "source": "poly_haven",
+      "library_path": "/Users/Luigi/Documents/Blender/Poly Haven"
+    },
+    {
+      "name": "Camera_01",
+      "source": "poly_haven",
+      "library_path": "/Users/Luigi/Documents/Blender/Poly Haven"
+    },
+    {
+      "name": "mouse",
+      "source": "manual",
+      "library_path": "/Users/Luigi/Documents/Blender/Custom Assets"
+    }
+  ],
+  "models_meta": {
+    "total_count": 9,
+    "unique_count": 6,
+    "duplicate_count": 3,
+    "duplicate_cap_percent": 33.0
+  }
+}
