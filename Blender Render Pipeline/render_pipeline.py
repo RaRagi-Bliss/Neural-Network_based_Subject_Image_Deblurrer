@@ -27,10 +27,12 @@
 """
 
 import argparse
+import hashlib
 import json
 import math
 import os
 import random
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -87,6 +89,45 @@ def rand_vec3(ranges: dict) -> Vector:
     )
 
 
+def sha256_of_file(path: str, chunk_size: int = 1024 * 1024) -> str:
+    """Content hash of a rendered output file - ties a specific image's bytes
+    to its manifest record, independent of whether the run is reproducible."""
+    hasher = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(chunk_size), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+def get_git_provenance(repo_dir: str):
+    """
+    Best-effort code-version provenance: the exact commit this pipeline ran
+    from, plus whether the working tree had uncommitted changes at the time
+    (a commit hash alone is misleading if the tree was dirty). Returns None
+    if this isn't a git repo or git isn't available - not treated as fatal.
+    """
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=True,
+        ).stdout.strip()
+        status = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=True,
+        ).stdout
+        return {"commit": commit, "dirty": bool(status.strip())}
+    except (subprocess.SubprocessError, FileNotFoundError, OSError):
+        return None
+
+
 # ---------------------------------------------------------------------------
 #  Scene Setup
 # ---------------------------------------------------------------------------
@@ -134,19 +175,15 @@ def configure_render_engine(scene, cfg: dict):
                             "GPU not available and fallback_to_cpu is false."
                         )
 
-        scene.cycles.samples = cfg["720p render example"].get("samples", 128)
+        scene.cycles.samples = cfg["output"].get("samples", 128)
 
 
 def configure_output(scene, cfg: dict):
-    """Set resolution, format, and 720p render example path."""
-    scene.render.image_settings.file_format = cfg["720p render example"].get(
-        "image_format", "PNG"
-    )
-    scene.render.image_settings.color_depth = cfg["720p render example"].get(
-        "color_depth", "8"
-    )
-    scene.render.resolution_x = cfg["720p render example"].get("resolution_x", 1280)
-    scene.render.resolution_y = cfg["720p render example"].get("resolution_y", 720)
+    """Set resolution, format, and output path."""
+    scene.render.image_settings.file_format = cfg["output"].get("image_format", "PNG")
+    scene.render.image_settings.color_depth = cfg["output"].get("color_depth", "8")
+    scene.render.resolution_x = cfg["output"].get("resolution_x", 1280)
+    scene.render.resolution_y = cfg["output"].get("resolution_y", 720)
     scene.render.resolution_percentage = 100
 
 
@@ -298,7 +335,7 @@ def randomise_camera(camera_obj, cfg: dict):
     camera_obj.data.lens = rand_range(*lens_range)
 
 
-def randomise_lighting(cfg: dict):
+def randomise_lighting(cfg: dict) -> dict:
     """
     Randomise scene lighting.
 
@@ -308,33 +345,49 @@ def randomise_lighting(cfg: dict):
               which also drives realistic reflections/ambient light, not just
               a flat colour. This is what you'll use once Poly Haven HDRIs
               are in play.
+
+    Returns the actual values applied, for provenance/reproducibility.
     """
     light_cfg = cfg["lighting"]
 
     if light_cfg.get("randomise_hdri", False):
-        apply_random_hdri(light_cfg)
-    else:
-        # Procedural sun light
-        sun = bpy.data.objects.get("Sun")
-        if sun and sun.type == "LIGHT":
-            sun.data.energy = rand_range(*light_cfg["sun_energy_range"])
-            rot_deg = rand_range(*light_cfg["sun_rotation_range_deg"])
-            sun.rotation_euler = Euler(
-                (
-                    math.radians(rand_range(20, 80)),
-                    0,
-                    math.radians(rot_deg),
-                ),
-                "XYZ",
-            )
+        return apply_random_hdri(light_cfg)
 
-        # Flat coloured sky, ambient strength only
-        world = bpy.context.scene.world
-        if world and world.use_nodes:
-            bg = world.node_tree.nodes.get("Background")
-            if bg:
-                strength = rand_range(*light_cfg["ambient_strength_range"])
-                bg.inputs["Strength"].default_value = strength
+    result = {
+        "mode": "procedural_sun",
+        "sun_energy": None,
+        "sun_rotation_deg": None,
+        "ambient_strength": None,
+    }
+
+    # Procedural sun light
+    sun = bpy.data.objects.get("Sun")
+    if sun and sun.type == "LIGHT":
+        energy = rand_range(*light_cfg["sun_energy_range"])
+        sun.data.energy = energy
+        rot_deg = rand_range(*light_cfg["sun_rotation_range_deg"])
+        pitch_deg = rand_range(20, 80)
+        sun.rotation_euler = Euler(
+            (
+                math.radians(pitch_deg),
+                0,
+                math.radians(rot_deg),
+            ),
+            "XYZ",
+        )
+        result["sun_energy"] = round(energy, 3)
+        result["sun_rotation_deg"] = [round(pitch_deg, 2), 0.0, round(rot_deg, 2)]
+
+    # Flat coloured sky, ambient strength only
+    world = bpy.context.scene.world
+    if world and world.use_nodes:
+        bg = world.node_tree.nodes.get("Background")
+        if bg:
+            strength = rand_range(*light_cfg["ambient_strength_range"])
+            bg.inputs["Strength"].default_value = strength
+            result["ambient_strength"] = round(strength, 3)
+
+    return result
 
 
 def get_hdri_file_list(hdri_dir: str) -> list:
@@ -397,13 +450,22 @@ def ensure_hdri_world_nodes(world):
     return env_node, mapping_node
 
 
-def apply_random_hdri(light_cfg: dict):
+def apply_random_hdri(light_cfg: dict) -> dict:
     """
     Pick a random HDRI file from lighting.hdri_directory, load it (or reuse
     it if already loaded this session), and assign it to the world.
     Also randomises the HDRI's rotation around Z so the same file doesn't
     always light the scene from the same direction.
+
+    Returns the actual values applied, for provenance/reproducibility.
     """
+    result = {
+        "mode": "hdri_directory",
+        "hdri_file": None,
+        "rotation_z_deg": None,
+        "strength": None,
+    }
+
     hdri_dir = light_cfg.get("hdri_directory", "")
     hdri_files = get_hdri_file_list(hdri_dir)
 
@@ -412,9 +474,10 @@ def apply_random_hdri(light_cfg: dict):
             f"WARNING: randomise_hdri is true but no .hdr/.exr files found "
             f"in '{hdri_dir}'. Falling back to flat sky for this render."
         )
-        return
+        return result
 
     chosen_path = random.choice(hdri_files)
+    result["hdri_file"] = os.path.basename(chosen_path)
 
     world = bpy.context.scene.world
     if world is None:
@@ -434,12 +497,16 @@ def apply_random_hdri(light_cfg: dict):
     # Randomise rotation so lighting direction varies even on repeat files
     rot_z = rand_range(0, 2 * math.pi)
     mapping_node.inputs["Rotation"].default_value = (0, 0, rot_z)
+    result["rotation_z_deg"] = round(math.degrees(rot_z), 2)
 
     # Optional overall strength jitter, reusing the ambient range from config
     bg_node = world.node_tree.nodes.get("Background")
     if bg_node:
         strength = rand_range(*light_cfg.get("ambient_strength_range", [0.5, 1.5]))
         bg_node.inputs["Strength"].default_value = strength
+        result["strength"] = round(strength, 3)
+
+    return result
 
 
 def randomise_scene_objects(cfg: dict):
@@ -670,9 +737,7 @@ def parse_args() -> argparse.Namespace:
         "--count", type=int, default=None, help="Override num_renders from config"
     )
     parser.add_argument(
-        "--outdir",
-        default=None,
-        help="Override 720p render example directory from config",
+        "--outdir", default=None, help="Override output directory from config"
     )
     parser.add_argument(
         "--seed", type=int, default=None, help="Override random seed from config"
@@ -693,8 +758,8 @@ def run_pipeline():
     if not os.path.exists(config_path):
         log(f"Config not found at {config_path} — using built-in defaults.")
         cfg = {
-            "720p render example": {
-                "directory": "./720p render example",
+            "output": {
+                "directory": "./output",
                 "image_format": "PNG",
                 "color_depth": "8",
                 "resolution_x": 1280,
@@ -760,14 +825,14 @@ def run_pipeline():
     if args.count is not None:
         cfg["pipeline"]["num_renders"] = args.count
     if args.outdir is not None:
-        cfg["720p render example"]["directory"] = args.outdir
+        cfg["output"]["directory"] = args.outdir
     if args.seed is not None:
         cfg["pipeline"]["seed"] = args.seed
 
     # Seed RNG
     # A fixed integer seed reproduces the exact same "random" sequence every
     # run — useful for debugging, but it's why you were seeing identical
-    # 720p render example every time. Setting "seed": null in config.json (the new
+    # output every time. Setting "seed": null in config.json (the new
     # default) makes each run genuinely different, while still logging
     # whatever seed got used so a specific run can be reproduced later if
     # you ever need to by passing --seed <that number>.
@@ -780,7 +845,7 @@ def run_pipeline():
     random.seed(seed)
 
     # Output directory
-    out_dir = cfg["720p render example"]["directory"]
+    out_dir = cfg["output"]["directory"]
     if not os.path.isabs(out_dir):
         out_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), out_dir)
     os.makedirs(out_dir, exist_ok=True)
@@ -796,7 +861,7 @@ def run_pipeline():
 
     scene = bpy.context.scene
 
-    # Configure render engine and 720p render example settings
+    # Configure render engine and output settings
     configure_render_engine(scene, cfg)
     configure_output(scene, cfg)
 
@@ -895,16 +960,17 @@ def run_pipeline():
         # and strength instead — identity stays fixed within a checkpoint,
         # but the lighting direction/intensity still varies every render.
         if use_asset_pool:
-            pool_manager.randomize_hdri_transform(cfg["lighting"])
+            lighting_meta = pool_manager.randomize_hdri_transform(cfg["lighting"])
         else:
-            randomise_lighting(cfg)
+            lighting_meta = randomise_lighting(cfg)
 
         randomise_scene_objects(cfg)
 
         # Reposition/reorient whichever pool models are currently loaded —
         # every render, independent of the checkpoint cadence above.
+        model_placements = []
         if use_asset_pool:
-            pool_manager.randomize_model_transforms(
+            model_placements = pool_manager.randomize_model_transforms(
                 cfg["scene_objects"].get(
                     "position_range", {"x": [-2, 2], "y": [-2, 2], "z": [0, 0]}
                 )
@@ -923,6 +989,7 @@ def run_pipeline():
 
         sharp_path = os.path.join(out_dir, f"{idx_str}_sharp.png")
         render_to_file(sharp_path)
+        sharp_sha256 = sha256_of_file(sharp_path)
 
         # ── BLUR shots — same base camera pose, N motion+focus variants ────
         blur_variants = []
@@ -934,11 +1001,13 @@ def run_pipeline():
             blur_filename = f"{idx_str}_blur_{b:02d}.png"
             blur_path = os.path.join(out_dir, blur_filename)
             render_to_file(blur_path)
+            blur_sha256 = sha256_of_file(blur_path)
 
             blur_variants.append(
                 {
                     "blur_file": blur_filename,
                     "blur_index": b,
+                    "sha256": blur_sha256,
                     "motion_blur": {
                         **motion_meta,
                         "shutter_speed": round(shutter_used, 3),
@@ -969,12 +1038,14 @@ def run_pipeline():
         entry = {
             "index": idx,
             "sharp_file": f"{idx_str}_sharp.png",
+            "sharp_sha256": sharp_sha256,
             "blur_variants": blur_variants,
             "camera": {
                 "location": cam_location,
                 "rotation_deg": cam_rotation,
                 "lens_mm": cam_lens,
             },
+            "lighting": lighting_meta,
             "render_time_s": iter_elapsed,
             "seed_offset": i,
         }
@@ -984,8 +1055,11 @@ def run_pipeline():
             entry["asset_pool"] = {
                 "hdri": sel["hdri"]["name"],
                 "floor_texture": sel["floor_texture"]["name"],
-                "models": [m["name"] for m in sel["models"]],
                 "is_checkpoint_start": checkpoint_meta is not None,
+                # Full per-instance placement (name + final location/rotation) -
+                # this is what actually makes this render's object layout
+                # reconstructable without needing to replay the RNG stream.
+                "model_instances": model_placements,
             }
 
         manifest.append(entry)
@@ -1006,6 +1080,7 @@ def run_pipeline():
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "num_pairs": num_renders,
         "seed": seed,
+        "code_provenance": get_git_provenance(_SCRIPT_DIR),
         "config": cfg,
         "pairs": manifest,
     }

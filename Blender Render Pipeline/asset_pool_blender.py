@@ -27,9 +27,8 @@ import random
 import re
 
 import bpy
-from mathutils import Euler, Matrix, Vector
-
 from asset_pool_selection import build_pools_for_mode, select_checkpoint, validate_pools
+from mathutils import Euler, Matrix, Vector
 
 
 def rand_range(lo, hi):
@@ -170,6 +169,7 @@ class AssetPoolManager:
 
         self.current_selection = None
         self.model_roots = []  # list of bpy Empty objects, one per model instance
+        self.model_instance_names = []  # parallel list: source asset name for each root
 
     # -- public API ---------------------------------------------------------
 
@@ -203,7 +203,9 @@ class AssetPoolManager:
 
         self._load_hdri(selection["hdri"])
         self._load_floor_texture(selection["floor_texture"])
-        self.model_roots = self._load_models(selection["models"])
+        instances = self._load_models(selection["models"])
+        self.model_instance_names = [name for name, _ in instances]
+        self.model_roots = [root for _, root in instances]
 
         return selection
 
@@ -215,14 +217,20 @@ class AssetPoolManager:
           - random rotation per instance
           - ground-snapped so nothing floats above or clips through the floor
           - roughly non-overlapping, via a fast bounding-sphere approximation
+
+        Returns a list of per-instance placement records (name, final
+        location, final rotation) - this is the exact data needed to
+        reconstruct this specific render's object placement without having
+        to replay the RNG stream.
         """
         if not self.model_roots:
-            return
+            return []
 
         floor_z = self._floor_top_z()
         placed = []  # (x, y, radius) of instances already placed this render
+        report = []
 
-        for root in self.model_roots:
+        for name, root in zip(self.model_instance_names, self.model_roots):
             rotation = rand_euler_full()
             rotation_matrix = rotation.to_matrix()
 
@@ -233,6 +241,7 @@ class AssetPoolManager:
                 # happen) - fall back to the old purely-random placement.
                 root.rotation_euler = rotation
                 root.location = rand_vec3(position_range)
+                report.append(self._placement_record(name, root))
                 continue
 
             # Apply the rotation we're about to give the object BEFORE measuring -
@@ -258,23 +267,39 @@ class AssetPoolManager:
             root.rotation_euler = rotation
             root.location = Vector((x, y, floor_z - min_z_local))
             placed.append((x, y, radius))
+            report.append(self._placement_record(name, root))
 
-    def randomize_hdri_transform(self, light_cfg: dict):
-        """Jitter HDRI rotation + strength without swapping which HDRI is loaded. Call every render."""
+        return report
+
+    def _placement_record(self, name: str, root) -> dict:
+        return {
+            "name": name,
+            "location": [round(v, 4) for v in root.location],
+            "rotation_deg": [round(math.degrees(v), 2) for v in root.rotation_euler],
+        }
+
+    def randomize_hdri_transform(self, light_cfg: dict) -> dict:
+        """Jitter HDRI rotation + strength without swapping which HDRI is loaded.
+        Call every render. Returns the actual values applied, for provenance."""
+        result = {"rotation_z_deg": None, "strength": None}
+
         world = bpy.context.scene.world
         if not world or not world.use_nodes:
-            return
+            return result
+
         mapping_node = world.node_tree.nodes.get("HDRI_Mapping")
         if mapping_node:
-            mapping_node.inputs["Rotation"].default_value = (
-                0,
-                0,
-                rand_range(0, 2 * math.pi),
-            )
+            rot_z = rand_range(0, 2 * math.pi)
+            mapping_node.inputs["Rotation"].default_value = (0, 0, rot_z)
+            result["rotation_z_deg"] = round(math.degrees(rot_z), 2)
+
         bg_node = world.node_tree.nodes.get("Background")
         if bg_node:
             strength = rand_range(*light_cfg.get("ambient_strength_range", [0.5, 1.5]))
             bg_node.inputs["Strength"].default_value = strength
+            result["strength"] = round(strength, 3)
+
+        return result
 
     # -- geometry helpers (ground-snapping / overlap avoidance) -------------
 
@@ -434,9 +459,12 @@ class AssetPoolManager:
         return obj_copy
 
     def _load_models(self, entries: list) -> list:
+        """Returns a list of (asset_name, root_empty) pairs - paired explicitly
+        rather than relying on list-index alignment, since an entry can be
+        skipped entirely (missing/corrupt .blend) without leaving a gap."""
         collection = bpy.context.scene.collection
         master_cache = {}
-        roots = []
+        instances = []
 
         for i, entry in enumerate(entries):
             name = entry["name"]
@@ -454,7 +482,7 @@ class AssetPoolManager:
                 if master_obj.parent is None:  # only walk from top-level objects
                     self._copy_hierarchy(master_obj, empty, collection)
 
-            roots.append(empty)
+            instances.append((name, empty))
 
         # Master objects are only needed as a copy source - remove them now that
         # copies exist and reference the same mesh/material data. The data
@@ -463,7 +491,7 @@ class AssetPoolManager:
             for master_obj in masters:
                 bpy.data.objects.remove(master_obj, do_unlink=True)
 
-        return roots
+        return instances
 
     def _unload_current(self):
         for root in self.model_roots:
@@ -471,6 +499,7 @@ class AssetPoolManager:
                 bpy.data.objects.remove(child, do_unlink=True)
             bpy.data.objects.remove(root, do_unlink=True)
         self.model_roots = []
+        self.model_instance_names = []
 
         # Reclaim mesh/material/image/world data that's no longer referenced
         # by anything (previous checkpoint's models, floor material, HDRI image).
