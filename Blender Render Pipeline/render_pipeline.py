@@ -99,6 +99,19 @@ def sha256_of_file(path: str, chunk_size: int = 1024 * 1024) -> str:
     return hasher.hexdigest()
 
 
+def sha256_of_json(obj) -> str:
+    """
+    Deterministic hash of a JSON-serialisable object - sorted keys and no
+    incidental whitespace, so the same logical data always produces the same
+    hash regardless of dict insertion order. Used to bind an entire manifest
+    entry (all its file hashes + all its recorded parameters) into a single
+    combined hash, so editing the metadata is just as detectable as editing
+    an image file would be.
+    """
+    canonical = json.dumps(obj, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def get_git_provenance(repo_dir: str):
     """
     Best-effort code-version provenance: the exact commit this pipeline ran
@@ -178,6 +191,40 @@ def configure_render_engine(scene, cfg: dict):
         scene.cycles.samples = cfg["output"].get("samples", 128)
 
 
+def disable_stamp_metadata(scene):
+    """
+    Blender can embed metadata (date, time, scene name, camera, render time,
+    etc.) directly into PNG/JPEG/EXR file bytes - a separate mechanism from
+    the visual on-image stamp overlay, and per Blender's own documentation
+    this can happen even when the master stamp toggle itself is off, if an
+    individual field is independently enabled. For hash-based authenticity
+    checking to mean anything, none of that can silently vary between runs
+    or scene files - so every field is explicitly forced off here rather
+    than trusting whatever a scene/version happens to default to.
+    """
+    stamp_fields = [
+        "use_stamp",
+        "use_stamp_time",
+        "use_stamp_date",
+        "use_stamp_render_time",
+        "use_stamp_frame",
+        "use_stamp_frame_range",
+        "use_stamp_memory",
+        "use_stamp_camera",
+        "use_stamp_lens",
+        "use_stamp_scene",
+        "use_stamp_note",
+        "use_stamp_marker",
+        "use_stamp_filename",
+        "use_stamp_sequencer_strip",
+        "use_stamp_strip_meta",
+        "use_stamp_labels",
+    ]
+    for field in stamp_fields:
+        if hasattr(scene.render, field):
+            setattr(scene.render, field, False)
+
+
 def configure_output(scene, cfg: dict):
     """Set resolution, format, and output path."""
     scene.render.image_settings.file_format = cfg["output"].get("image_format", "PNG")
@@ -185,6 +232,7 @@ def configure_output(scene, cfg: dict):
     scene.render.resolution_x = cfg["output"].get("resolution_x", 1280)
     scene.render.resolution_y = cfg["output"].get("resolution_y", 720)
     scene.render.resolution_percentage = 100
+    disable_stamp_metadata(scene)
 
 
 def build_procedural_scene(cfg: dict | None = None):
@@ -1061,6 +1109,13 @@ def run_pipeline():
                 # reconstructable without needing to replay the RNG stream.
                 "model_instances": model_placements,
             }
+
+        # Combined hash over the ENTIRE entry (every file's sha256 + every
+        # recorded parameter) - computed last, over everything else in the
+        # entry, so tampering with either an image file OR its recorded
+        # metadata is equally detectable. Not included in the hashed content
+        # itself, for obvious reasons.
+        entry["entry_sha256"] = sha256_of_json(entry)
 
         manifest.append(entry)
 

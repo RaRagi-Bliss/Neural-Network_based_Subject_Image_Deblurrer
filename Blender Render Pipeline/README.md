@@ -71,8 +71,12 @@ renders, and prints motion blur / depth-of-field statistics across the run.
 ### Sixth set of Requirements (optional — verifying authenticity of a specific image):
 Every entry in `manifest.json` records everything that shaped that render: the exact camera pose, lighting values,
 which HDRI/floor texture/model instances were used and their exact placements, the blur/DOF parameters for every
-variant, and — for tamper-evidence — a SHA-256 hash of every output PNG plus the exact git commit (and whether the
-working tree was clean) the pipeline ran from.
+variant, and — for tamper-evidence — a SHA-256 hash of every output PNG, a combined hash over the entire entry, plus
+the exact git commit (and whether the working tree was clean) the pipeline ran from.
+
+The pipeline also explicitly disables every one of Blender's stamp/metadata fields before rendering (date, time,
+render time, scene name, etc.), so nothing gets silently embedded inside the PNG files themselves that could vary
+between machines or runs — the only thing being hashed is genuine pixel content.
 
 **What this lets you verify today, without Blender or re-rendering anything:**
 1. Open `manifest.json` and find the entry for the image in question, matching on `sharp_file` (or a blur variant's
@@ -84,7 +88,23 @@ working tree was clean) the pipeline ran from.
    ```
 3. Compare it against that entry's `sharp_sha256` (or the matching blur variant's `sha256`). A match means the file
    is exactly the one this pipeline produced for that record — not re-compressed, edited, or swapped for another file.
-4. Check `code_provenance.commit` at the top of `manifest.json` against a known commit in this repo, and confirm
+4. To check the *entry's recorded metadata* hasn't been edited (camera pose, lighting, asset placements, etc.) —
+   which a plain file hash alone can't catch, since someone could edit `manifest.json`'s text without touching any
+   image — recompute `entry_sha256` yourself and compare:
+   ```python
+   import json, hashlib
+
+   def sha256_of_json(obj):
+       canonical = json.dumps(obj, sort_keys=True, separators=(",", ":"))
+       return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+   entry = manifest_data["pairs"][0]                 # the entry you're checking
+   recorded_hash = entry.pop("entry_sha256")          # remove it before recomputing - it wasn't part of what was hashed
+   assert sha256_of_json(entry) == recorded_hash
+   ```
+   A match confirms every file hash *and* every recorded parameter in that entry is exactly as originally produced —
+   editing either one breaks this check.
+5. Check `code_provenance.commit` at the top of `manifest.json` against a known commit in this repo, and confirm
    `code_provenance.dirty` is `false` — this ties the image to an exact, citable version of the pipeline code rather
    than "some version of it." `code_provenance` will be `null` if the pipeline wasn't run from inside a git repo.
 
@@ -92,4 +112,7 @@ working tree was clean) the pipeline ran from.
 matches pixel-for-pixel. The manifest records every value that was used, but the pipeline itself always draws fresh
 random values on each run — there's no "replay" mode that forces it to reuse a specific recorded set of values
 instead. Building that is a separate, scoped piece of work (a handful of the randomisation functions would need to
-accept an optional override value instead of only ever generating one) and doesn't exist in this codebase yet.
+accept an optional override value instead of only ever generating one) and doesn't exist in this codebase yet. Worth
+noting too: exact pixel-for-pixel reproduction across *different machines* may not be achievable even with a replay
+tool, since GPU-rendered results can differ very slightly across different hardware/drivers even with an identical
+seed and scene.
