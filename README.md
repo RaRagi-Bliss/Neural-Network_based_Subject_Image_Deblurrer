@@ -171,7 +171,7 @@ The project is being submitted for university in its current state. User testing
 | PyTorch dataset adapter    | Written | Not yet run on real renders                     |
 | ENGR489 opinion surveying  | Next | To be completed right after artefact submission |
 
-### Phase 2: After university
+### Phase 2: After submission
 
 | # | Stage | Notes |
 |---|---|---|
