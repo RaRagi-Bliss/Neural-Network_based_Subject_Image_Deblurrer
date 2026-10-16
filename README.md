@@ -4,8 +4,6 @@ A reference-guided deblurring tool for photographers, and the synthetic training
 
 > **Status:** The Blender rendering pipeline and its verification tooling are essentially complete. User testing is the next step for submission. The deblurring model is in the planning stage, and its development continues after university.
 
-This README replaces the Blender-only README. The setup steps from that file are carried over into [Setup](#8-setup).
-
 ---
 
 ## 1. Motivation
@@ -155,8 +153,6 @@ python3 render_pair_dataset.py --root "./720p render example"
 ---
 
 ## 8. Ethics and resourcing
-
-The brief sets two ethics requirements that shape the project.
 
 - **Sourcing of training assets.** Digital assets, art and 3D models are often protected by copyright or licences that do not permit reuse outside their original context. The project uses Poly Haven assets (CC0) and manually sourced assets whose provenance must be recorded. Keeping training data and the training process ethically sourced is a stated requirement, not an optional extra.
 - **Surveys and user testing.** The only approved survey so far is the ENGR489 cohort survey. A wider public survey or public user testing would need further ethics review.
